@@ -4,48 +4,6 @@ import glob
 import os
 import xlsxwriter
 
-
-def load_files():
-    '''
-        Find ./input/*.csv files
-
-            Returns:
-                files: all files under "./input/*.csv"
-    '''
-    # setting the path for joining multiple files
-    files = os.path.join("input/", "*.csv")
-
-    # list of merged files returned
-    files = glob.glob(files)
-    return files
-
-def combine_csv():
-    '''
-        Load and concat files together
-
-            Returns
-                dataframe: dataframe of combined input files
-    '''
-    files = load_files()
-    dataframe1 = pd.read_csv(files[0], sep='comma', header=None, index_col=False, engine="python", quotechar='"')
-    # Split without splitting ""
-    dataframe1 = dataframe1[0].str.split(r',(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)', expand=True)
-
-    dataframe2 = pd.concat([pd.read_csv(f, sep='comma', header=None, index_col=False, engine="python", quotechar='"').drop([0,1,2,3,4,5,6]) for f in files ])
-    # Split without splitting ""
-    dataframe2 = dataframe2[0].str.split(r',(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)', expand=True)
-
-    # Combine
-    dataframe = pd.concat([dataframe1, dataframe2])
-
-    # Reset the axis for future combining
-    dataframe = dataframe.set_axis(range(0, len(dataframe.index)), axis=0, copy = False)
-
-    '''This is for saving to a file if needed'''
-    #dataframe.to_csv("out.csv", index=False, sep=',', header=False)
-
-    return dataframe
-
 def set_columns(dataframe_excel):
     '''
         Remove unneeded columns
@@ -60,23 +18,18 @@ def set_columns(dataframe_excel):
     # Split header from excel file
     dataframe_excel_header = dataframe_excel.iloc[:6]
 
-    # Remove headers that aren't needed from header
-    dataframe_excel_header.drop([3,6,9,10], axis=1, inplace = True)
     dataframe_excel_header.reset_index(drop=True, inplace = True)
 
 
     # Split body from excel file
     dataframe_excel_body = dataframe_excel.iloc[6:]
 
-    # Remove headers that aren't needed from body
-    dataframe_excel_body.drop([3,6,8,9,10], axis=1, inplace = True)
-
     # Insert Campus column
     dataframe_excel_body.insert(0, "0", pd.NA)
     dataframe_excel_body.at[6,"0"] = "Campus"
 
     # Reset axis for both header and body
-    dataframe_excel_header = dataframe_excel_header.set_axis(range(0, 7), axis=1, copy = False)
+    dataframe_excel_header = dataframe_excel_header.set_axis(range(0, 6), axis=1, copy = False)
     dataframe_excel_body = dataframe_excel_body.set_axis(range(0, 7), axis=1, copy = False)
 
     return (dataframe_excel_header, dataframe_excel_body)
@@ -289,8 +242,8 @@ def save_file(dataframe):
         writer.sheets['Data'].set_column(col_idx, col_idx, column_width)
     writer.close()
 
-def main():
-    dataframe = combine_csv()
+def run_new_system(dataframe):
+    print("New Layout Detected")
     (dataframe_excel_header, dataframe_excel_body) = set_columns(dataframe)
     dataframe_excel_data = dataframe_excel_body.iloc[1:]
     dataframe_excel_body = dataframe_excel_body.iloc[:1]
