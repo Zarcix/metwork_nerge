@@ -18,14 +18,11 @@ def set_columns(dataframe_excel):
     # Split header from excel file
     dataframe_excel_header = dataframe_excel.iloc[:6]
 
-    # Remove headers that aren't needed from header
+    # Remove unnecessary columns and reindex them
     dataframe_excel_header.drop([3,6,8,9,10], axis=1, inplace = True)
-
-
     dataframe_excel_header.reset_index(drop=True, inplace = True)
 
-
-    # Split body from excel file
+    # Get body from full file
     dataframe_excel_body = dataframe_excel.iloc[6:]
 
     # Remove headers that aren't needed from body
@@ -82,9 +79,11 @@ def find_useless_data(dataframe):
                     2: ip_10_15_end
                     3: ip_10_21_16_1_start
                     4: ip_10_21_23_254_end
-                    5: ip_10_35_228_1_start
-                    6: ip_10_35_231_254_end
-                    7: ip_end
+                    5: ip_10_35_216_1_start
+                    6: ip_10_35_223_254_end
+                    7: ip_10_35_228_1_start
+                    8: ip_10_35_231_254_end
+                    9: ip_end
     '''
 
 
@@ -100,6 +99,10 @@ def find_useless_data(dataframe):
     ip_10_21_16_1_start = 0
     ip_10_21_23_254_end = 0
 
+    # Index start and end for 10.35.[216-223].*
+    ip_10_35_216_1_start = 0
+    ip_10_35_223_254_end = 0
+
     # Index start and end for 10.35.[228-231].*
     ip_10_35_228_1_start = 0
     ip_10_35_231_254_end = 0
@@ -107,18 +110,26 @@ def find_useless_data(dataframe):
     # Last index
     ip_end = len(dataframe.index) + 1
 
-    ip_10_15_start = ip_start
+    '''
+    IP: 10.15.0.0 -> 10.15.254.254 end
+    '''
+
+    ip_10_15_start = ip_start # Set start location as last end
     for data in dataframe[4]:
         ip_10_15_start += 1
+        # Keep searching until it hits the ip
         if "10.15" in data:
             break
-
+    
     ip_10_15_end = ip_10_15_start
     for data in dataframe[4].iloc[ip_10_15_start:]:
         if "10.15" not in data:
             break
-
         ip_10_15_end += 1
+
+    '''
+    IP: 10.21.16.1 -> 10.21.23.254
+    '''
 
     ip_10_21_16_1_start = ip_10_15_end
     for data in dataframe[4].iloc[ip_10_15_end:]:
@@ -136,9 +147,34 @@ def find_useless_data(dataframe):
             break
 
         ip_10_21_23_254_end += 1
+   
+    '''
+    IP: 10.35.216.1 -> 10.35.223.254
+    '''
 
-    ip_10_35_228_1_start = ip_10_21_23_254_end
+    ip_10_35_216_1_start = ip_10_21_23_254_end
     for data in dataframe[4].iloc[ip_10_21_23_254_end:]:
+        ip_10_35_216_1_start += 1
+        if "10.35.216" in data:
+            print("Broke")
+            break
+    
+    ip_10_35_223_254_end = ip_10_35_216_1_start
+    for data in dataframe[4].iloc[ip_10_35_216_1_start:]:
+        if "10.35.223" in data:
+            for data in dataframe[4].iloc[ip_10_35_223_254_end:]:
+                if "10.35.223" not in data:
+                    break
+                ip_10_35_223_254_end += 1
+            break
+        ip_10_35_223_254_end += 1
+
+    '''
+    IP: 10.35.228.1 -> 10.35.231.254
+    '''
+    
+    ip_10_35_228_1_start = ip_10_35_223_254_end
+    for data in dataframe[4].iloc[ip_10_35_223_254_end:]:
         ip_10_35_228_1_start += 1
         if "10.35.228" in data:
             break
@@ -151,9 +187,10 @@ def find_useless_data(dataframe):
                     break
                 ip_10_35_231_254_end += 1
             break
-
         ip_10_35_231_254_end += 1
-    return [ip_start, ip_10_15_start, ip_10_15_end, ip_10_21_16_1_start, ip_10_21_23_254_end, ip_10_35_228_1_start, ip_10_35_231_254_end, ip_end]
+    
+
+    return [ip_start, ip_10_15_start, ip_10_15_end, ip_10_21_16_1_start, ip_10_21_23_254_end, ip_10_35_216_1_start, ip_10_35_223_254_end ,ip_10_35_228_1_start, ip_10_35_231_254_end, ip_end]
 
 def set_campus(dataframe, ips):
     '''
@@ -164,12 +201,12 @@ def set_campus(dataframe, ips):
                 ips: IP list for campus detection
 
     '''
-    for i in range(ips[0], ips[7]):
+    for i in range(ips[0], ips[9]):
         if ips[1] - 1 <= i <= ips[2]:
             dataframe.at[i,0] = "Stockton"
         elif ips[3] <= i <= ips[4]:
             dataframe.at[i,0] = "Sacramento"
-        elif ips[5] <= i <= ips[6]:
+        elif ips[5] <= i <= ips[6] or ips[7] <= i <= ips[8]:
             dataframe.at[i,0] = "San Francisco"
 
 def remove_bad_data(dataframe, ips):
@@ -183,10 +220,11 @@ def remove_bad_data(dataframe, ips):
             Return:
                 dataframe: dataframe with removed data
     '''
-    dataframe.drop(range(ips[0],ips[1]), inplace = True)
-    dataframe.drop(range(ips[2],ips[3]), inplace = True)
-    dataframe.drop(range(ips[4],ips[5]), inplace = True)
-    dataframe.drop(range(ips[6],ips[7]), inplace = True)
+    dataframe.drop(range(ips[0],ips[1]), inplace = True) # < 10.15
+    dataframe.drop(range(ips[2],ips[3]), inplace = True) # 10.15 -> 10.21.16.1
+    dataframe.drop(range(ips[4],ips[5]), inplace = True) # 10.21.23.254 -> 10.35.216.1
+    dataframe.drop(range(ips[6],ips[7]), inplace = True) # 10.25.223.254 -> 10.35.228.1
+    dataframe.drop(range(ips[8],ips[9]), inplace = True) # 10.35.231.254 >
 
     dataframe = dataframe.set_axis(range(1, len(dataframe.index) + 1), axis=0, copy = False)
     return dataframe
@@ -200,12 +238,16 @@ def setup_stats(dataframe, ips):
                 ips: IP list for stats calculation
     '''
     dataframe.at[1,2] = "Stockton"
-    dataframe.at[1,3] = "Sacramento"
-    dataframe.at[1,4] = "San Francisco"
-
     dataframe.at[2,2] = ips[2] - ips[1]
+
+    dataframe.at[1,3] = "Sacramento"
     dataframe.at[2,3] = ips[4] - ips[3]
-    dataframe.at[2,4] = ips[6] - ips[5]
+
+    sf_total = ips[6] - ips[5]
+    sf_total += ips[8] - ips[7]
+
+    dataframe.at[1,4] = "San Francisco"
+    dataframe.at[2,4] = sf_total
 
 def setup_data(dataframe):
     '''
@@ -264,6 +306,3 @@ def run_old_system(dataframe):
 
     dataframe = pd.concat([dataframe_excel_header, dataframe_excel_body, dataframe_excel_data], ignore_index = True)
     save_file(dataframe)
-
-if __name__ == "__main__":
-    main()
