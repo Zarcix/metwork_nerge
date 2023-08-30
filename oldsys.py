@@ -79,9 +79,11 @@ def find_useless_data(dataframe):
                     2: ip_10_15_end
                     3: ip_10_21_16_1_start
                     4: ip_10_21_23_254_end
-                    5: ip_10_35_228_1_start
-                    6: ip_10_35_231_254_end
-                    7: ip_end
+                    5: ip_10_35_216_1_start
+                    6: ip_10_35_223_254_end
+                    7: ip_10_35_228_1_start
+                    8: ip_10_35_231_254_end
+                    9: ip_end
     '''
 
 
@@ -96,6 +98,10 @@ def find_useless_data(dataframe):
     # Index start and end for 10.21.[16-23].*
     ip_10_21_16_1_start = 0
     ip_10_21_23_254_end = 0
+
+    # Index start and end for 10.35.[216-223].*
+    ip_10_35_216_1_start = 0
+    ip_10_35_223_254_end = 0
 
     # Index start and end for 10.35.[228-231].*
     ip_10_35_228_1_start = 0
@@ -166,7 +172,7 @@ def find_useless_data(dataframe):
     '''
     IP: 10.35.228.1 -> 10.35.231.254
     '''
-
+    
     ip_10_35_228_1_start = ip_10_35_223_254_end
     for data in dataframe[4].iloc[ip_10_35_223_254_end:]:
         ip_10_35_228_1_start += 1
@@ -182,6 +188,7 @@ def find_useless_data(dataframe):
                 ip_10_35_231_254_end += 1
             break
         ip_10_35_231_254_end += 1
+    
 
     return [ip_start, ip_10_15_start, ip_10_15_end, ip_10_21_16_1_start, ip_10_21_23_254_end, ip_10_35_216_1_start, ip_10_35_223_254_end ,ip_10_35_228_1_start, ip_10_35_231_254_end, ip_end]
 
@@ -231,12 +238,16 @@ def setup_stats(dataframe, ips):
                 ips: IP list for stats calculation
     '''
     dataframe.at[1,2] = "Stockton"
-    dataframe.at[1,3] = "Sacramento"
-    dataframe.at[1,4] = "San Francisco"
-
     dataframe.at[2,2] = ips[2] - ips[1]
+
+    dataframe.at[1,3] = "Sacramento"
     dataframe.at[2,3] = ips[4] - ips[3]
-    dataframe.at[2,4] = (ips[6] - ips[5]) + (ips[8] - ips[7])
+
+    sf_total = ips[6] - ips[5]
+    sf_total += ips[8] - ips[7]
+
+    dataframe.at[1,4] = "San Francisco"
+    dataframe.at[2,4] = sf_total
 
 def setup_data(dataframe):
     '''
