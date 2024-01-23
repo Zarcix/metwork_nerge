@@ -1,10 +1,8 @@
+from typing import Tuple
 import pandas as pd
-import numpy as np
-import glob
-import os
-import xlsxwriter
+import logging, sys
 
-def set_columns(dataframe_excel):
+def set_columns(dataframe_full: pd.DataFrame):
     '''
         Remove unneeded columns
 
@@ -16,20 +14,20 @@ def set_columns(dataframe_excel):
                 dataframe body: dataframe's body after modification
     '''
     # Split header from excel file
-    dataframe_excel_header = dataframe_excel.iloc[:6]
+    dataframe_excel_header: pd.DataFrame = dataframe_full.iloc[:6]
 
     # Remove unnecessary columns and reindex them
-    dataframe_excel_header.drop([3,6,8,9,10], axis=1, inplace = True)
+    dataframe_excel_header = dataframe_excel_header.drop([3,6,8,9,10], axis=1)
     dataframe_excel_header.reset_index(drop=True, inplace = True)
 
     # Get body from full file
-    dataframe_excel_body = dataframe_excel.iloc[6:]
+    dataframe_excel_body: pd.DataFrame = dataframe_full.iloc[6:]
 
     # Remove headers that aren't needed from body
-    dataframe_excel_body.drop([3,6,8,9,10], axis=1, inplace = True)
+    dataframe_excel_body = dataframe_excel_body.drop([3,6,8,9,10], axis=1)
 
     # Insert Campus column
-    dataframe_excel_body.insert(0, "0", pd.NA)
+    dataframe_excel_body.insert(0, "0", "")
     dataframe_excel_body.at[6,"0"] = "Campus"
 
     # Reset axis for both header and body
@@ -38,7 +36,7 @@ def set_columns(dataframe_excel):
 
     return (dataframe_excel_header, dataframe_excel_body)
 
-def sort_data(dataframe):
+def sort_data(dataframe: pd.DataFrame):
     '''
         !!! Must be run after set_columns !!!
 
@@ -49,7 +47,7 @@ def sort_data(dataframe):
     '''
     dataframe.sort_values(by=[4], axis=0, inplace=True)
 
-def remove_duplicates(dataframe):
+def remove_duplicates(dataframe: pd.DataFrame):
     '''
         !!! Must be run after set_columns !!!
         Removes duplicates on Users
@@ -65,7 +63,7 @@ def remove_duplicates(dataframe):
     dataframe = dataframe.set_axis(range(1, len(dataframe.index) + 1), axis=0, copy = False)
     return dataframe
 
-def find_useless_data(dataframe):
+def find_useful_data_indices(dataframe: pd.DataFrame) -> list[Tuple[int, int, str]]:
     '''
         Indexes through data and finds the useless ip's and grabs index
 
@@ -87,115 +85,47 @@ def find_useless_data(dataframe):
     '''
 
 
-    ### These are all indexes
-    # Start index
-    ip_start = 1
+    # (Starting IP, Ending IP, Campus)
+    ips_to_keep: list[Tuple[str, str, str]] = [
+        ("10.15", "10.15", "Stockton"), 
+        ("10.21.16", "10.21.23", "Sacramento"), 
+        ("10.35.216", "10.35.223", "San Francisco"), 
+        ("10.35.228", "10.35.231", "San Francisco")
+    ]
 
-    # Index start and end for 10.15.*.*
-    ip_10_15_start = 0
-    ip_10_15_end = 0
+    ip_ranges: list[Tuple[int, int, str]] = []
 
-    # Index start and end for 10.21.[16-23].*
-    ip_10_21_16_1_start = 0
-    ip_10_21_23_254_end = 0
+    for ip in ips_to_keep:
+        result = get_useless_indexes(dataframe[4], ip[0], ip[1])
+        ip_ranges.append((result[0], result[1], ip[2]))
 
-    # Index start and end for 10.35.[216-223].*
-    ip_10_35_216_1_start = 0
-    ip_10_35_223_254_end = 0
+    return ip_ranges
 
-    # Index start and end for 10.35.[228-231].*
-    ip_10_35_228_1_start = 0
-    ip_10_35_231_254_end = 0
-
-    # Last index
-    ip_end = len(dataframe.index) + 1
-
-    '''
-    IP: 10.15.0.0 -> 10.15.254.254 end
-    '''
-    ip_10_15_start = ip_start # Set start location as last end
-    for data in dataframe[4]:
-        ip_10_15_start += 1
-        # Keep searching until it hits the ip
-        if "10.15" in data:
+def get_useless_indexes(dataframe: pd.DataFrame, start_ip: str, end_ip: str):
+    # Set starting index
+    ip_start = 0
+    for data in dataframe:
+        ip_start += 1
+        if start_ip in data:
             break
     
-    print(f"0 <-> 10.15: {ip_start} {ip_10_15_start}")
-
-    ip_10_15_end = ip_10_15_start
-    for data in dataframe[4].iloc[ip_10_15_start:]:
-        if "10.15" not in data:
-            break
-        ip_10_15_end += 1
-    
-    '''
-    IP: 10.21.16.1 -> 10.21.23.254
-    '''
-
-    ip_10_21_16_1_start = ip_start
-    for data in dataframe[4]:
-        ip_10_21_16_1_start += 1
-        if "10.21.16" in data:
-            break
-
-    ip_10_21_23_254_end = ip_10_21_16_1_start
-    for data in dataframe[4].iloc[ip_10_21_16_1_start:]:
-        if "10.21.23" in data:
-            for data in dataframe[4].iloc[ip_10_21_23_254_end:]:
-                if "10.21.23" not in data:
+    # Set ending index
+    ip_end = ip_start
+    for data in dataframe.iloc[ip_start:]:
+        if end_ip in data:
+            # Go to the end of the ip range
+            for data in dataframe.iloc[ip_end:]:
+                if end_ip not in data:
                     break
-                ip_10_21_23_254_end += 1
+                ip_end += 1
             break
-
-        ip_10_21_23_254_end += 1
-
-    print(f"10.21.16.1 <-> 10.21.23.254: {ip_10_21_16_1_start} {ip_10_21_23_254_end}")
-    '''
-    IP: 10.35.216.1 -> 10.35.223.254
-    '''
-
-    ip_10_35_216_1_start = ip_start
-    for data in dataframe[4]:
-        ip_10_35_216_1_start += 1
-        if "10.35.216" in data:
-            break
+        ip_end += 1
     
-    ip_10_35_223_254_end = ip_10_35_216_1_start
-    for data in dataframe[4].iloc[ip_10_35_216_1_start:]:
-        if "10.35.223" in data:
-            for data in dataframe[4].iloc[ip_10_35_223_254_end:]:
-                if "10.35.223" not in data:
-                    break
-                ip_10_35_223_254_end += 1
-            break
-        ip_10_35_223_254_end += 1
-
-    print(f"10.35.216.1 -> 10.35.223.254: {ip_10_35_216_1_start} {ip_10_35_223_254_end}")
-    '''
-    IP: 10.35.228.1 -> 10.35.231.254
-    '''
+    logging.debug(f"{start_ip} -> {end_ip}: {ip_start} {ip_end}")
+    return (ip_start, ip_end)
     
-    ip_10_35_228_1_start = ip_start
-    for data in dataframe[4]:
-        ip_10_35_228_1_start += 1
-        if "10.35.228" in data:
-            break
-
-    ip_10_35_231_254_end = ip_10_35_228_1_start
-    for data in dataframe[4].iloc[ip_10_35_228_1_start:]:
-        if "10.35.231" in data:
-            for data in dataframe[4].iloc[ip_10_35_231_254_end:]:
-                if "10.35.231" not in data:
-                    break
-                ip_10_35_231_254_end += 1
-            break
-        ip_10_35_231_254_end += 1
-
-    print(f"10.35.228.1 -> 10.35.231.254: {ip_10_35_228_1_start} {ip_10_35_231_254_end}")
-
-    return [ip_start, ip_10_15_start, ip_10_15_end, ip_10_21_16_1_start, ip_10_21_23_254_end, ip_10_35_216_1_start, ip_10_35_223_254_end ,ip_10_35_228_1_start, ip_10_35_231_254_end, ip_end]
-
-def set_campus(dataframe, ips):
+def set_campus(dataframe: pd.DataFrame, ips: list[Tuple[int, int, str]]):
+    
     '''
         Set campus when values are in range
 
@@ -204,15 +134,11 @@ def set_campus(dataframe, ips):
                 ips: IP list for campus detection
 
     '''
-    for i in range(ips[0], ips[9]):
-        if ips[1] - 1 <= i <= ips[2]:
-            dataframe.at[i,0] = "Stockton"
-        elif ips[3] <= i <= ips[4]:
-            dataframe.at[i,0] = "Sacramento"
-        elif ips[5] <= i <= ips[6] or ips[7] <= i <= ips[8]:
-            dataframe.at[i,0] = "San Francisco"
+    for ip_range in ips:
+        for i in range(ip_range[0], ip_range[1] + 1):
+            dataframe.at[i,0] = ip_range[2]
 
-def remove_bad_data(dataframe, ips):
+def clean_data(dataframe: pd.DataFrame, ips: list[Tuple[int, int, str]]):
     '''
         Drop unneeded ranges of data
 
@@ -224,15 +150,13 @@ def remove_bad_data(dataframe, ips):
                 dataframe: dataframe with removed data
     '''
     retDataframe = pd.DataFrame()
-    retDataframe = pd.concat([retDataframe, dataframe.iloc[ips[1] : ips[2]]])
-    retDataframe = pd.concat([retDataframe, dataframe.iloc[ips[3] : ips[4]]])
-    retDataframe = pd.concat([retDataframe, dataframe.iloc[ips[5] : ips[6]]])
-    retDataframe = pd.concat([retDataframe, dataframe.iloc[ips[7] : ips[8]]])
+    for ip_range in ips:
+        retDataframe = pd.concat([retDataframe, dataframe.iloc[ip_range[0]:ip_range[1]]])
 
     dataframe = retDataframe.set_axis(range(1, len(retDataframe.index) + 1), axis=0, copy = False)
     return dataframe
 
-def setup_stats(dataframe, ips):
+def setup_stats(dataframe: pd.DataFrame, ips: list[Tuple[int, int, str]]):
     '''
         Set up statistics in the header
 
@@ -240,19 +164,22 @@ def setup_stats(dataframe, ips):
                 dataframe: dataframe for insertion
                 ips: IP list for stats calculation
     '''
+    # Create lists with only their respective campus
+    stk_ips = filter(lambda x: x[2] == "Stockton", ips) 
+    sac_ips = filter(lambda x: x[2] == "Sacramento", ips)
+    sf_ips = filter(lambda x: x[2] == "San Francisco", ips)
+
+    # Set them based on campus
     dataframe.at[1,2] = "Stockton"
-    dataframe.at[2,2] = ips[2] - ips[1]
+    dataframe.at[2,2] = sum(map(lambda x: x[1] - x[0], stk_ips))
 
     dataframe.at[1,3] = "Sacramento"
-    dataframe.at[2,3] = ips[4] - ips[3]
-
-    sf_total = ips[6] - ips[5]
-    sf_total += ips[8] - ips[7]
+    dataframe.at[2,3] = sum(map(lambda x: x[1] - x[0], sac_ips))
 
     dataframe.at[1,4] = "San Francisco"
-    dataframe.at[2,4] = sf_total
+    dataframe.at[2,4] = sum(map(lambda x: x[1] - x[0], sf_ips))
 
-def setup_data(dataframe):
+def setup_data(dataframe: pd.DataFrame):
     '''
         Helper function to set up big data list
 
@@ -263,39 +190,37 @@ def setup_data(dataframe):
                 dataframe: dataframe that got modified
                 ips: IP list of useful ips
     '''
-    ips = find_useless_data(dataframe)
+    ips = find_useful_data_indices(dataframe)
 
     set_campus(dataframe, ips)
-    dataframe = remove_bad_data(dataframe, ips)
+    dataframe = clean_data(dataframe, ips)
 
     return (dataframe, ips)
 
-def save_file(dataframe):
+def save_file(dataframe: pd.DataFrame):
     '''
         Save the modified excel sheet
 
             Parameters:
                 dataframe: dataframe to write to save file
     '''
-    writer = pd.ExcelWriter('output.xlsx')
+    with pd.ExcelWriter('output.xlsx')  as writer:
+        dataframe.to_excel(
+            writer,
+            sheet_name='Data',
+            columns = None,
+            header = False,
+            index = False,
+            freeze_panes=(7, 0),
+        )
+        # Formatting Save
+        for column in dataframe:
+            column_width = max(dataframe[column].astype(str).map(len).max(), len(str(column)))
+            col_idx = dataframe.columns.get_loc(column)
+            writer.sheets['Data'].set_column(col_idx, col_idx, column_width)
 
-    dataframe.to_excel(
-        writer,
-        sheet_name='Data',
-        columns = None,
-        header = False,
-        index = False,
-        freeze_panes=(7, 0),
-    )
-    # Formatting Save
-    for column in dataframe:
-        column_width = max(dataframe[column].astype(str).map(len).max(), len(str(column)))
-        col_idx = dataframe.columns.get_loc(column)
-        writer.sheets['Data'].set_column(col_idx, col_idx, column_width)
-    writer.close()
-
-def run_old_system(dataframe):
-    print("Old Layout Detected")
+def run_old_system(dataframe: pd.DataFrame):
+    logging.debug("Old Layout Detected")
     (dataframe_excel_header, dataframe_excel_body) = set_columns(dataframe)
     dataframe_excel_data = dataframe_excel_body.iloc[1:]
     dataframe_excel_body = dataframe_excel_body.iloc[:1]
