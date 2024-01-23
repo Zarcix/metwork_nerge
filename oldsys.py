@@ -113,7 +113,6 @@ def find_useless_data(dataframe):
     '''
     IP: 10.15.0.0 -> 10.15.254.254 end
     '''
-
     ip_10_15_start = ip_start # Set start location as last end
     for data in dataframe[4]:
         ip_10_15_start += 1
@@ -121,18 +120,20 @@ def find_useless_data(dataframe):
         if "10.15" in data:
             break
     
+    print(f"0 <-> 10.15: {ip_start} {ip_10_15_start}")
+
     ip_10_15_end = ip_10_15_start
     for data in dataframe[4].iloc[ip_10_15_start:]:
         if "10.15" not in data:
             break
         ip_10_15_end += 1
-
+    
     '''
     IP: 10.21.16.1 -> 10.21.23.254
     '''
 
-    ip_10_21_16_1_start = ip_10_15_end
-    for data in dataframe[4].iloc[ip_10_15_end:]:
+    ip_10_21_16_1_start = ip_start
+    for data in dataframe[4]:
         ip_10_21_16_1_start += 1
         if "10.21.16" in data:
             break
@@ -147,16 +148,16 @@ def find_useless_data(dataframe):
             break
 
         ip_10_21_23_254_end += 1
-   
+
+    print(f"10.21.16.1 <-> 10.21.23.254: {ip_10_21_16_1_start} {ip_10_21_23_254_end}")
     '''
     IP: 10.35.216.1 -> 10.35.223.254
     '''
 
-    ip_10_35_216_1_start = ip_10_21_23_254_end
-    for data in dataframe[4].iloc[ip_10_21_23_254_end:]:
+    ip_10_35_216_1_start = ip_start
+    for data in dataframe[4]:
         ip_10_35_216_1_start += 1
         if "10.35.216" in data:
-            print("Broke")
             break
     
     ip_10_35_223_254_end = ip_10_35_216_1_start
@@ -169,12 +170,13 @@ def find_useless_data(dataframe):
             break
         ip_10_35_223_254_end += 1
 
+    print(f"10.35.216.1 -> 10.35.223.254: {ip_10_35_216_1_start} {ip_10_35_223_254_end}")
     '''
     IP: 10.35.228.1 -> 10.35.231.254
     '''
     
-    ip_10_35_228_1_start = ip_10_35_223_254_end
-    for data in dataframe[4].iloc[ip_10_35_223_254_end:]:
+    ip_10_35_228_1_start = ip_start
+    for data in dataframe[4]:
         ip_10_35_228_1_start += 1
         if "10.35.228" in data:
             break
@@ -188,7 +190,8 @@ def find_useless_data(dataframe):
                 ip_10_35_231_254_end += 1
             break
         ip_10_35_231_254_end += 1
-    
+
+    print(f"10.35.228.1 -> 10.35.231.254: {ip_10_35_228_1_start} {ip_10_35_231_254_end}")
 
     return [ip_start, ip_10_15_start, ip_10_15_end, ip_10_21_16_1_start, ip_10_21_23_254_end, ip_10_35_216_1_start, ip_10_35_223_254_end ,ip_10_35_228_1_start, ip_10_35_231_254_end, ip_end]
 
@@ -220,13 +223,13 @@ def remove_bad_data(dataframe, ips):
             Return:
                 dataframe: dataframe with removed data
     '''
-    dataframe.drop(range(ips[0],ips[1]), inplace = True) # < 10.15
-    dataframe.drop(range(ips[2],ips[3]), inplace = True) # 10.15 -> 10.21.16.1
-    dataframe.drop(range(ips[4],ips[5]), inplace = True) # 10.21.23.254 -> 10.35.216.1
-    dataframe.drop(range(ips[6],ips[7]), inplace = True) # 10.25.223.254 -> 10.35.228.1
-    dataframe.drop(range(ips[8],ips[9]), inplace = True) # 10.35.231.254 >
+    retDataframe = pd.DataFrame()
+    retDataframe = pd.concat([retDataframe, dataframe.iloc[ips[1] : ips[2]]])
+    retDataframe = pd.concat([retDataframe, dataframe.iloc[ips[3] : ips[4]]])
+    retDataframe = pd.concat([retDataframe, dataframe.iloc[ips[5] : ips[6]]])
+    retDataframe = pd.concat([retDataframe, dataframe.iloc[ips[7] : ips[8]]])
 
-    dataframe = dataframe.set_axis(range(1, len(dataframe.index) + 1), axis=0, copy = False)
+    dataframe = retDataframe.set_axis(range(1, len(retDataframe.index) + 1), axis=0, copy = False)
     return dataframe
 
 def setup_stats(dataframe, ips):
