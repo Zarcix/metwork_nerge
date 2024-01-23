@@ -2,6 +2,14 @@ from typing import Tuple
 import pandas as pd
 import logging, sys
 
+# (Starting IP, Ending IP, Campus)
+ips_to_keep: list[Tuple[str, str, str]] = [
+    ("10.15", "10.15", "Stockton"), 
+    ("10.21.16", "10.21.23", "Sacramento"), 
+    ("10.35.216", "10.35.223", "San Francisco"), 
+    ("10.35.228", "10.35.231", "San Francisco")
+]
+
 def set_columns(dataframe_full: pd.DataFrame):
     '''
         Remove unneeded columns
@@ -65,33 +73,14 @@ def remove_duplicates(dataframe: pd.DataFrame):
 
 def find_useful_data_indices(dataframe: pd.DataFrame) -> list[Tuple[int, int, str]]:
     '''
-        Indexes through data and finds the useless ip's and grabs index
-
+        Loops through data to grab all needed ip ranges
+        
             Parameters:
-                dataframe: Dataframe to find useless data in
-
+                dataframe: pd.Dataframe - dataframe that contains all columns of data
+            
             Returns:
-                int[]: array of indexes in following order:
-                    0: ip_start
-                    1: ip_10_15_start
-                    2: ip_10_15_end
-                    3: ip_10_21_16_1_start
-                    4: ip_10_21_23_254_end
-                    5: ip_10_35_216_1_start
-                    6: ip_10_35_223_254_end
-                    7: ip_10_35_228_1_start
-                    8: ip_10_35_231_254_end
-                    9: ip_end
+                A list of tuples in format (starting index, ending index, campus)
     '''
-
-
-    # (Starting IP, Ending IP, Campus)
-    ips_to_keep: list[Tuple[str, str, str]] = [
-        ("10.15", "10.15", "Stockton"), 
-        ("10.21.16", "10.21.23", "Sacramento"), 
-        ("10.35.216", "10.35.223", "San Francisco"), 
-        ("10.35.228", "10.35.231", "San Francisco")
-    ]
 
     ip_ranges: list[Tuple[int, int, str]] = []
 
@@ -130,8 +119,8 @@ def set_campus(dataframe: pd.DataFrame, ips: list[Tuple[int, int, str]]):
         Set campus when values are in range
 
             Parameters:
-                dataframe: dataframe for campus overwrite
-                ips: IP list for campus detection
+                dataframe: dataframe for setting campus for ips
+                ips: list of ips with ranges and campus
 
     '''
     for ip_range in ips:
@@ -143,16 +132,19 @@ def clean_data(dataframe: pd.DataFrame, ips: list[Tuple[int, int, str]]):
         Drop unneeded ranges of data
 
             Parameters:
-                dataframe: dataframe for ip removal
-                ips: IP list for bad ip removal
+                dataframe: dataframe for ip retrieval
+                ips: wanted ip indexes
 
             Return:
-                dataframe: dataframe with removed data
+                dataframe: dataframe with wanted data
     '''
     retDataframe = pd.DataFrame()
+    
+    # Loop over all ip ranges and append ips in range
     for ip_range in ips:
         retDataframe = pd.concat([retDataframe, dataframe.iloc[ip_range[0]:ip_range[1]]])
 
+    # Reset the axis
     dataframe = retDataframe.set_axis(range(1, len(retDataframe.index) + 1), axis=0, copy = False)
     return dataframe
 
@@ -204,7 +196,9 @@ def save_file(dataframe: pd.DataFrame):
             Parameters:
                 dataframe: dataframe to write to save file
     '''
-    with pd.ExcelWriter('output.xlsx')  as writer:
+    outFile = 'output.xlsx'
+    with pd.ExcelWriter(outFile)  as writer:
+        logging.debug(f"Saving results to {outFile}")
         dataframe.to_excel(
             writer,
             sheet_name='Data',
@@ -221,16 +215,20 @@ def save_file(dataframe: pd.DataFrame):
 
 def run_old_system(dataframe: pd.DataFrame):
     logging.debug("Old Layout Detected")
-    (dataframe_excel_header, dataframe_excel_body) = set_columns(dataframe)
-    dataframe_excel_data = dataframe_excel_body.iloc[1:]
-    dataframe_excel_body = dataframe_excel_body.iloc[:1]
+    (df_header, df_column_names) = set_columns(dataframe)
+    df_data = df_column_names.iloc[1:]
+    df_column_names = df_column_names.iloc[:1]
 
-    sort_data(dataframe_excel_data)
+    logging.debug("Sorting data by IPs")
+    sort_data(df_data)
 
-    dataframe_excel_data = remove_duplicates(dataframe_excel_data)
+    logging.debug("Removing duplicate IPs")
+    df_data = remove_duplicates(df_data)
 
-    (dataframe_excel_data, ips) = setup_data(dataframe_excel_data)
-    setup_stats(dataframe_excel_header, ips)
+    logging.debug("Setting up data with headcounts")
+    (df_data, ips) = setup_data(df_data)
+    setup_stats(df_header, ips)
 
-    dataframe = pd.concat([dataframe_excel_header, dataframe_excel_body, dataframe_excel_data], ignore_index = True)
+    logging.debug("Concat-ing all dataframes")
+    dataframe = pd.concat([df_header, df_column_names, df_data], ignore_index = True)
     save_file(dataframe)
