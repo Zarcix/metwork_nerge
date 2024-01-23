@@ -1,14 +1,11 @@
 from typing import Tuple
 import pandas as pd
 import logging, sys
+from datamod import DataMod
 
 # (Starting IP, Ending IP, Campus)
-ips_to_keep: list[Tuple[str, str, str]] = [
-    ("10.15", "10.15", "Stockton"), 
-    ("10.21.16", "10.21.23", "Sacramento"), 
-    ("10.35.216", "10.35.223", "San Francisco"), 
-    ("10.35.228", "10.35.231", "San Francisco")
-]
+
+brain = DataMod()
 
 def set_columns(dataframe_full: pd.DataFrame):
     '''
@@ -44,109 +41,7 @@ def set_columns(dataframe_full: pd.DataFrame):
 
     return (dataframe_excel_header, dataframe_excel_body)
 
-def sort_data(dataframe: pd.DataFrame):
-    '''
-        !!! Must be run after set_columns !!!
 
-        Sorts data by IP Addr
-
-            Parameters:
-                dataframe: dataframe to sort
-    '''
-    dataframe.sort_values(by=[4], axis=0, inplace=True)
-
-def remove_duplicates(dataframe: pd.DataFrame):
-    '''
-        !!! Must be run after set_columns !!!
-        Removes duplicates on Users
-
-            Parameters:
-                dataframe: input dataframe to remove duplicates
-
-            Returns:
-                dataframe: modified dataframe
-
-    '''
-    dataframe.drop_duplicates(subset=[2], inplace = True)
-    dataframe = dataframe.set_axis(range(1, len(dataframe.index) + 1), axis=0, copy = False)
-    return dataframe
-
-def find_useful_data_indices(dataframe: pd.DataFrame) -> list[Tuple[int, int, str]]:
-    '''
-        Loops through data to grab all needed ip ranges
-        
-            Parameters:
-                dataframe: pd.Dataframe - dataframe that contains all columns of data
-            
-            Returns:
-                A list of tuples in format (starting index, ending index, campus)
-    '''
-
-    ip_ranges: list[Tuple[int, int, str]] = []
-
-    for ip in ips_to_keep:
-        result = get_useless_indexes(dataframe[4], ip[0], ip[1])
-        ip_ranges.append((result[0], result[1], ip[2]))
-
-    return ip_ranges
-
-def get_useless_indexes(dataframe: pd.DataFrame, start_ip: str, end_ip: str):
-    # Set starting index
-    ip_start = 0
-    for data in dataframe:
-        ip_start += 1
-        if start_ip in data:
-            break
-    
-    # Set ending index
-    ip_end = ip_start
-    for data in dataframe.iloc[ip_start:]:
-        if end_ip in data:
-            # Go to the end of the ip range
-            for data in dataframe.iloc[ip_end:]:
-                if end_ip not in data:
-                    break
-                ip_end += 1
-            break
-        ip_end += 1
-    
-    logging.debug(f"{start_ip} -> {end_ip}: {ip_start} {ip_end}")
-    return (ip_start, ip_end)
-    
-def set_campus(dataframe: pd.DataFrame, ips: list[Tuple[int, int, str]]):
-    
-    '''
-        Set campus when values are in range
-
-            Parameters:
-                dataframe: dataframe for setting campus for ips
-                ips: list of ips with ranges and campus
-
-    '''
-    for ip_range in ips:
-        for i in range(ip_range[0], ip_range[1] + 1):
-            dataframe.at[i,0] = ip_range[2]
-
-def clean_data(dataframe: pd.DataFrame, ips: list[Tuple[int, int, str]]):
-    '''
-        Drop unneeded ranges of data
-
-            Parameters:
-                dataframe: dataframe for ip retrieval
-                ips: wanted ip indexes
-
-            Return:
-                dataframe: dataframe with wanted data
-    '''
-    retDataframe = pd.DataFrame()
-    
-    # Loop over all ip ranges and append ips in range
-    for ip_range in ips:
-        retDataframe = pd.concat([retDataframe, dataframe.iloc[ip_range[0]:ip_range[1]]])
-
-    # Reset the axis
-    dataframe = retDataframe.set_axis(range(1, len(retDataframe.index) + 1), axis=0, copy = False)
-    return dataframe
 
 def setup_stats(dataframe: pd.DataFrame, ips: list[Tuple[int, int, str]]):
     '''
@@ -171,23 +66,7 @@ def setup_stats(dataframe: pd.DataFrame, ips: list[Tuple[int, int, str]]):
     dataframe.at[1,4] = "San Francisco"
     dataframe.at[2,4] = sum(map(lambda x: x[1] - x[0], sf_ips))
 
-def setup_data(dataframe: pd.DataFrame):
-    '''
-        Helper function to set up big data list
 
-            Parameters:
-                dataframe: dataframe for setup and data removal
-
-            Returns:
-                dataframe: dataframe that got modified
-                ips: IP list of useful ips
-    '''
-    ips = find_useful_data_indices(dataframe)
-
-    set_campus(dataframe, ips)
-    dataframe = clean_data(dataframe, ips)
-
-    return (dataframe, ips)
 
 def save_file(dataframe: pd.DataFrame):
     '''
@@ -219,14 +98,7 @@ def run_old_system(dataframe: pd.DataFrame):
     df_data = df_column_names.iloc[1:]
     df_column_names = df_column_names.iloc[:1]
 
-    logging.debug("Sorting data by IPs")
-    sort_data(df_data)
-
-    logging.debug("Removing duplicate IPs")
-    df_data = remove_duplicates(df_data)
-
-    logging.debug("Setting up data with headcounts")
-    (df_data, ips) = setup_data(df_data)
+    (df_data, ips) = brain.process_data(df_data)
     setup_stats(df_header, ips)
 
     logging.debug("Concat-ing all dataframes")
