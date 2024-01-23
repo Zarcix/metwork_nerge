@@ -3,6 +3,7 @@ import glob
 import os
 from newsys import run_new_system
 from oldsys import run_old_system
+import logging
 
 def load_files():
     '''
@@ -53,6 +54,8 @@ def layout_type(dataframe):
     return len(dataframe.columns) == 6
 
 def main():
+    a = lambda x: "INFO" if x is None else x.upper()
+    logging.basicConfig(level = a(os.environ.get("LOG")))
     data = combine_csv()
     run_new_system(data) if layout_type(data) else run_old_system(data)
 
