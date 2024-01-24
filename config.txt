@@ -1,0 +1,15 @@
+[DEFAULT]
+emptyrange = []
+onevalue = [["start", "end"]]
+twovalue = [["start", "end"], ["start", "end"]]
+threevalue = [["start", "end"], ["start", "end"], ["start", "end"]]
+
+[STK]
+range = [ ["10.15" , "10.15"] ]
+
+[SAC]
+range = [ ["10.21.16" , "10.21.23"] ]
+
+[SF]
+range = [ ["10.35.216", "10.35.223"] , ["10.35.228", "10.35.231"] ]
+

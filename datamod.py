@@ -1,17 +1,44 @@
 from typing import Tuple
 import pandas as pd
 import logging
+import configparser, json
 
 class DataMod:
+    config = configparser.ConfigParser()
     ips_to_keep: list[Tuple[str, str, str]] = []
     
     def load_ip_list(self):
-        self.ips_to_keep = [
-            ("10.15", "10.15", "Stockton"), 
-            ("10.21.16", "10.21.23", "Sacramento"), 
-            ("10.35.216", "10.35.223", "San Francisco"),
-            ("10.35.228", "10.35.231", "San Francisco")
-        ]
+        '''
+        Loads a config list from config.txt
+        
+        If no config is found, a new config file will be created and parsed
+        '''
+        self.config.read('config.txt')
+        
+        headers = ["STK", "SAC", "SF"]
+        
+        if self.config.sections() != headers:
+            logging.debug(f"{self.config.sections()} {headers}\nNot all headers found. Adding...")
+            for header in headers:
+                try:
+                    self.config.add_section(header)
+                    self.config.set(header, "Range", "[]")
+                except:
+                    pass
+        
+        for ip_range in json.loads(self.config.get("STK", "Range")):
+            self.ips_to_keep.append((ip_range[0], ip_range[1], "Stockton"))
+            
+        for ip_range in json.loads(self.config.get("SAC", "Range")):
+            self.ips_to_keep.append((ip_range[0], ip_range[1], "Sacramento"))
+            
+        for ip_range in json.loads(self.config.get("SF", "Range")):
+            self.ips_to_keep.append((ip_range[0], ip_range[1], "San Francisco"))
+        
+        with open('config.txt', 'w') as configfile:
+            self.config.write(configfile)
+        
+        logging.debug(f"Loaded IP Range: {self.ips_to_keep}")
     
     def __init__(self):
         # TODO Load ip range from a file
@@ -67,7 +94,7 @@ class DataMod:
         ip_ranges: list[Tuple[int, int, str]] = []
 
         for ip in self.ips_to_keep:
-            result = self._get_useless_indexes(dataframe[4], ip[0], ip[1])
+            result = self._get_good_indexes(dataframe[4], ip[0], ip[1])
             ip_ranges.append((result[0], result[1], ip[2]))
 
         return ip_ranges
@@ -108,7 +135,7 @@ class DataMod:
         dataframe = retDataframe.set_axis(range(1, len(retDataframe.index) + 1), axis=0, copy = False)
         return dataframe
 
-    def _get_useless_indexes(self, dataframe: pd.DataFrame, start_ip: str, end_ip: str) -> Tuple[int, int]:
+    def _get_good_indexes(self, dataframe: pd.Series | pd.DataFrame, start_ip: str, end_ip: str) -> Tuple[int, int]:
         # Set starting index
         ip_start = 0
         for data in dataframe:
