@@ -1,11 +1,9 @@
 from typing import Tuple
 import pandas as pd
-import logging, sys
+import logging
 from datamod import DataMod
 
 # (Starting IP, Ending IP, Campus)
-
-brain = DataMod()
 
 def set_columns(dataframe_full: pd.DataFrame):
     '''
@@ -41,8 +39,6 @@ def set_columns(dataframe_full: pd.DataFrame):
 
     return (dataframe_excel_header, dataframe_excel_body)
 
-
-
 def setup_stats(dataframe: pd.DataFrame, ips: list[Tuple[int, int, str]]):
     '''
         Set up statistics in the header
@@ -65,8 +61,6 @@ def setup_stats(dataframe: pd.DataFrame, ips: list[Tuple[int, int, str]]):
 
     dataframe.at[1,4] = "San Francisco"
     dataframe.at[2,4] = sum(map(lambda x: x[1] - x[0], sf_ips))
-
-
 
 def save_file(dataframe: pd.DataFrame):
     '''
@@ -94,6 +88,9 @@ def save_file(dataframe: pd.DataFrame):
 
 def run_old_system(dataframe: pd.DataFrame):
     logging.debug("Old Layout Detected")
+    
+    brain = DataMod()
+    
     (df_header, df_column_names) = set_columns(dataframe)
     df_data = df_column_names.iloc[1:]
     df_column_names = df_column_names.iloc[:1]
