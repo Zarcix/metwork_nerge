@@ -3,11 +3,11 @@ use std::fs;
 
 use polars::prelude::*;
 
-pub struct CsvProcessor {
-    csv_path: &'static str,
+pub struct CsvConverter {
+    input_path: &'static str,
 }
 
-impl CsvProcessor {
+impl CsvConverter {
     pub fn process(&self) -> DataFrame {
         let files = self.get_files();
         let dataframes = self.csv_to_dataframe(&files).unwrap();
@@ -18,8 +18,8 @@ impl CsvProcessor {
 
     fn get_files(&self) -> Vec<PathBuf> {
         let mut path_vec = Vec::new();
-        fs::create_dir_all(self.csv_path).expect("Input folder expected");
-        let csv_files = fs::read_dir(self.csv_path).expect("Expected readable directory");
+        fs::create_dir_all(self.input_path).expect("Input folder expected");
+        let csv_files = fs::read_dir(self.input_path).expect("Expected readable directory");
 
         for file in csv_files {
             path_vec.push(file.unwrap().path());
@@ -48,10 +48,22 @@ impl CsvProcessor {
     }
 }
 
-impl Default for CsvProcessor {
+impl Default for CsvConverter {
     fn default() -> Self {
-        CsvProcessor {
-            csv_path: "./input"
+        CsvConverter {
+            input_path: "./input"
+        }
+    }
+}
+
+pub struct CsvWriter {
+    output_path: &'static str
+}
+
+impl Default for CsvWriter {
+    fn default() -> Self {
+        CsvWriter {
+            output_path: "./"
         }
     }
 }
