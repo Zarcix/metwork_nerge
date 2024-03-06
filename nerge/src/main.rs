@@ -4,9 +4,21 @@ mod datamod;
 
 use csv_interface::*;
 use layout_branch::*;
-use datamod::*;
+use simple_logger::*;
 
 fn main() {
+    init_logger();
+    process_data();
+}
+
+fn init_logger() {
+    SimpleLogger::new().init().unwrap();
+}
+
+fn process_data() {
     let csv_reader = CsvConverter::default();
-    csv_reader.process();
+    let base_dataframe = csv_reader.process();
+    route_layout(&base_dataframe);
+
+    let a = datamod::DataMod::default();
 }
