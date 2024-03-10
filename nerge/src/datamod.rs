@@ -1,13 +1,18 @@
 use std::error::Error;
 use configparser::ini::Ini;
 use polars::{frame::DataFrame, series::Series};
+use polars::prelude::*;
 pub struct DataMod {
     ip_ranges: Vec<(String, String, String)>, // Vector<(ip start, ip end, campus)>
 }
 
 impl DataMod {
     pub fn expose_fn(&self, dataframe: DataFrame) {
-        println!("{}", &self.drop_duplicates(self.sort(dataframe)));
+        let working_df = self.drop_duplicates(self.sort(dataframe));
+        let indices = self.get_data_indices(&working_df);
+        let mut new_df = self.drop_indices(&working_df, indices.clone());
+        self.update_campus(&mut new_df, indices);
+        log::debug!("{:?}", new_df);
     }
 
     fn sort(&self, dataframe: DataFrame) -> DataFrame {
@@ -20,28 +25,80 @@ impl DataMod {
         return dataframe.unique_stable(Some(&["column_2".into()]), polars::frame::UniqueKeepStrategy::First, None).expect("Expected dataframe without duplicates");
     }
 
-    fn get_data_indices(&self, dataframe: DataFrame) -> Vec<(String, String, String)> {
-        let data_indices = Vec::new();
+    fn get_data_indices(&self, dataframe: &DataFrame) -> Vec<(u32, u32, String)> {
+        let mut data_indices = Vec::new();
+        let dataframe = dataframe.column("column_5").unwrap();
 
-        for ip_range in &self.ip_ranges {
+        for (start_ip, end_ip, campus) in &self.ip_ranges {
+            let mut ip_start_idx = 0;
+            { // Get Start Index
+                // TODO multithread this
+                for data in dataframe.as_list().into_iter() {
+                    ip_start_idx += 1;
+                    if data.unwrap().get(0).unwrap().get_str().unwrap().contains(start_ip) {
+                        break;
+                    }
+                }
+                log::debug!("Got Starting Index: {:?}", ip_start_idx);
+            }
+            
+            let mut ip_end_idx = ip_start_idx;
+            { // Get Ending Index
+                // TODO multithread this
+                // Get start of ending index area after start index
+                let mut ip_end_idx_start = ip_end_idx;
+                for data in dataframe.as_list().into_iter().skip(ip_start_idx) {
+                    if data.unwrap().get(0).unwrap().get_str().unwrap().contains(end_ip) {
+                        break;
+                    }
+                    ip_end_idx_start += 1;
+                }
 
+                // Go to the end of the index to cover *.*.*.254
+                ip_end_idx = ip_end_idx_start;
+                for data in dataframe.as_list().into_iter().skip(ip_end_idx_start) {
+                    if !data.unwrap().get(0).unwrap().get_str().unwrap().contains(end_ip) {
+                        break;
+                    }
+                    ip_end_idx += 1;
+                }
+
+                log::debug!("Got Ending Index: {:?}", ip_end_idx);
+            }
+
+            data_indices.push((ip_start_idx as u32, ip_end_idx as u32, campus.clone()));
         }
+
 
         return data_indices;
     }
 
-    fn parse_data(&self, dataframe: Series, start_ip: String, end_ip: String) {
-        let starting_index = 0;
-        for data in dataframe.iter() {
-            println!("{data}")
+    fn update_campus(&self, dataframe: &mut DataFrame, indices: Vec<(u32, u32, String)>) {
+        let mut campus_series: ChunkedArray<StringType> = ChunkedArray::new("Campus", [""]);
+        for (start_ip, end_ip, campus) in indices {
+            for index in start_ip .. end_ip {
+                let campus: ChunkedArray<StringType> = ChunkedArray::new("Campus", [campus.clone()]);
+                campus_series.append(&campus);
+            }
         }
+        dataframe.insert_column(0, campus_series).unwrap();
+    }
+
+    fn drop_indices(&self, dataframe: &DataFrame, indices: Vec<(u32, u32, String)>) -> DataFrame {
+        let mut idx_vec = Vec::new();
+        for index in indices {
+            idx_vec.append(&mut (index.0 .. index.1).collect())
+        }
+        let kept_idxs = IdxCa::from_vec("keepIndex", idx_vec);
+
+        return dataframe.take(&kept_idxs).unwrap();
     }
 }
 
 impl Default for DataMod {
     fn default() -> Self {
         let ip_range = parse_config().ok().expect("Expected valid ip range from config.txt");
-        log::debug!("Loaded ip range: {ip_range:?}");
+        log::info!("Loaded ip range: {ip_range:?}");
 
         Self {
             ip_ranges: ip_range,
