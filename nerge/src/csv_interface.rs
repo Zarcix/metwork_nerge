@@ -60,6 +60,17 @@ pub struct CsvWriter {
     output_path: &'static str
 }
 
+impl CsvWriter {
+    pub fn write_df(&self, output_dataframe: &mut DataFrame) {
+        let mut file = std::fs::File::create(format!("{}/output.xlsx", self.output_path)).expect("could not create file");
+
+        polars::io::prelude::CsvWriter::new(&mut file)
+            .include_header(true)
+            .with_separator(b',')
+            .finish(output_dataframe).ok();
+    }
+}
+
 impl Default for CsvWriter {
     fn default() -> Self {
         CsvWriter {

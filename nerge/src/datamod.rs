@@ -1,3 +1,4 @@
+use std::borrow::BorrowMut;
 use std::error::Error;
 use configparser::ini::Ini;
 use polars::{frame::DataFrame, series::Series};
@@ -7,12 +8,12 @@ pub struct DataMod {
 }
 
 impl DataMod {
-    pub fn expose_fn(&self, dataframe: DataFrame) {
+    pub fn process_data(&self, dataframe: DataFrame) -> DataFrame {
         let working_df = self.drop_duplicates(self.sort(dataframe));
         let indices = self.get_data_indices(&working_df);
-        let mut new_df = self.drop_indices(&working_df, indices.clone());
-        self.update_campus(&mut new_df, indices);
+        let new_df = self.drop_indices(&working_df, indices.clone());
         log::debug!("{:?}", new_df);
+        new_df
     }
 
     fn sort(&self, dataframe: DataFrame) -> DataFrame {
@@ -73,25 +74,28 @@ impl DataMod {
         return data_indices;
     }
 
-    fn update_campus(&self, dataframe: &mut DataFrame, indices: Vec<(u32, u32, String)>) {
-        let mut campus_series: ChunkedArray<StringType> = ChunkedArray::new("Campus", [""]);
-        for (start_ip, end_ip, campus) in indices {
-            for index in start_ip .. end_ip {
-                let campus: ChunkedArray<StringType> = ChunkedArray::new("Campus", [campus.clone()]);
-                campus_series.append(&campus);
-            }
-        }
-        dataframe.insert_column(0, campus_series).unwrap();
+    fn update_campus(&self, campus_series: &mut Series, indices: (u32, u32, String)) {
+        let start = indices.0;
+        let end = indices.1;
+        let campus = indices.2;
+        
+        let campus_list = (start .. end).map(|_| campus.clone()).collect::<Vec<String>>();
+        let new_range = Series::new("Campus", campus_list);
+        campus_series.append(&new_range).ok();
     }
 
     fn drop_indices(&self, dataframe: &DataFrame, indices: Vec<(u32, u32, String)>) -> DataFrame {
         let mut idx_vec = Vec::new();
-        for index in indices {
-            idx_vec.append(&mut (index.0 .. index.1).collect())
+        let mut campus_series = Series::new_empty("Campus", &DataType::String);
+        for (start_idx, end_idx, campus) in indices {
+            self.update_campus(&mut campus_series, (start_idx, end_idx, campus));
+            idx_vec.append(&mut (start_idx .. end_idx).collect())
         }
         let kept_idxs = IdxCa::from_vec("keepIndex", idx_vec);
+        let mut dropped_df = dataframe.take(&kept_idxs).unwrap();
 
-        return dataframe.take(&kept_idxs).unwrap();
+        dropped_df.insert_column(0, campus_series).ok();
+        return dropped_df;
     }
 }
 

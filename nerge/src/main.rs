@@ -4,7 +4,8 @@ mod datamod;
 
 use csv_interface::*;
 use layout_branch::*;
-use polars::series::Series;
+
+use std::fs::File;
 
 fn main() {
     init_logger();
@@ -17,13 +18,10 @@ fn init_logger() {
 
 fn process_data() {
     let csv_reader = CsvConverter::default();
-    let mut base_dataframe = csv_reader.process();
-    // Old Layout
-    base_dataframe = base_dataframe.drop_many(&["column_4", "column_7", "column_9", "column_10", "column_11"]);
-    let header = base_dataframe.slice(0, 8);
-    let mut body = base_dataframe.slice(7, usize::MAX);
-    route_layout(&base_dataframe);
 
-    let a = datamod::DataMod::default();
-    a.expose_fn(body);
+    let base_dataframe = csv_reader.process();
+    let mut processed_dataframe = route_layout(&base_dataframe);
+    
+    let csv_writer = CsvWriter::default();
+    csv_writer.write_df(&mut processed_dataframe);
 }
